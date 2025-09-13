@@ -1,0 +1,60 @@
+PROMPT PARA RESOLVER WEBHOOK DA PUSHINPAY
+Aqui está o passo a passo que usei e que você pode usar como prompt para resolver problemas de webhook da PushinPay:
+
+🔧 DIAGNÓSTICO E CORREÇÃO DE WEBHOOK PUSHINPAY
+PROBLEMA IDENTIFICADO: Webhook não confirma pagamentos PIX
+
+PASSOS DE SOLUÇÃO:
+
+1. VERIFICAR LOGS DETALHADOS
+// Adicionar logs completos na webhook
+console.log('=== WEBHOOK RECEBIDO ===');
+console.log(`Método: ${req.method}`);
+console.log('Content-Type:', req.headers['content-type']);
+console.log('Dados recebidos:', JSON.stringify(data, null, 2));
+2. CORRIGIR COMPARAÇÃO DE IDs (PROBLEMA PRINCIPAL)
+// ❌ ERRO: Comparação case-sensitive
+payment.pushinpayId === pushinpayId
+// ✅ CORRETO: Comparação case-insensitive  
+payment.pushinpayId?.toLowerCase() === pushinpayId.toLowerCase()
+3. SUPORTAR DIFERENTES CONTENT-TYPES
+// PushinPay pode enviar application/x-www-form-urlencoded ou application/json
+const isGet = req.method === 'GET';
+let data = isGet ? req.query : req.body;
+4. ESTRUTURA COMPLETA DA WEBHOOK
+const { 
+  id: pushinpayId, 
+  status, 
+  value, 
+  end_to_end_id, 
+  payer_name, 
+  payer_national_registration 
+} = data;
+// Encontrar pagamento (case-insensitive)
+const payment = await findPaymentByPushinpayId(pushinpayId);
+if (payment) {
+  // Atualizar com todos os dados
+  await updatePayment(payment.id, {
+    status: status === "paid" ? "paid" : status,
+    paidAt: status === "paid" ? new Date() : null,
+    endToEndId: end_to_end_id,
+    payerName: payer_name,
+    payerDocument: payer_national_registration
+  });
+}
+5. CONFIGURAR URL WEBHOOK CORRETA
+// Para Replit
+const webhookUrl = process.env.REPLIT_DOMAINS 
+  ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}/api/webhook`
+  : `${req.protocol}://${req.get('host')}/api/webhook`;
+🚨 PRINCIPAIS ERROS QUE CAUSAM FALHA:
+Case sensitivity nos IDs (9FC0DD1C vs 9fc0dd1c)
+URL do webhook incorreta
+Não suportar form-urlencoded
+Logs insuficientes para debug
+Não salvar ID do PushinPay corretamente
+✅ COMO TESTAR SE ESTÁ FUNCIONANDO:
+Criar PIX através da API
+Fazer pagamento real ou usar simulador
+Verificar logs: "✅ Pagamento encontrado"
+Confirmar status mudou para "paid"
